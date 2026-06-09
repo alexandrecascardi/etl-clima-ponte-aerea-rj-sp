@@ -49,7 +49,7 @@ O pipeline extrai dados governamentais brutos, realiza o cruzamento com uma API 
 
 ## 🗂️ Modelagem (Star Schema)
 
-![Star Schema](docs/star_schema_digitalizado.png)
+![Star Schema](star_schema_digitalizado.png)
 
 > **Nota:** `DIM_AERONAVE` está mapeada no modelo e será implementada na próxima versão com dados simulados.
 
