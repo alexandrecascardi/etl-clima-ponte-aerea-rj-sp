@@ -62,7 +62,7 @@ O pipeline é dividido em módulos independentes dentro de `src/`, cada um respo
 
 ## 📊 Descobertas Operacionais Preliminares (Amostra de Jan/2024)
 
-O modelo dimensional foi desenhado para estruturar o caos dos dados brutos e otimizar consultas analíticas. Com o pipeline rodando e os dados de Janeiro consolidados, as seguintes volumetrias foram extraídas (scripts SQL disponíveis na pasta `notebooks/`):
+O modelo dimensional foi desenhado para estruturar o caos dos dados brutos e otimizar consultas analíticas. Com os dados de Janeiro processados, as seguintes volumetrias foram extraídas (scripts SQL disponíveis na pasta `notebooks/`):
 
 **1. Qual companhia aérea apresentou o maior aumento de cancelamentos sob clima adverso?**
 
