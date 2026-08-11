@@ -27,53 +27,57 @@ O pipeline extrai dados governamentais brutos, realiza o cruzamento com uma API 
 
 ## 🛠️ Tech Stack
 
-| Camada | Tecnologia |
-|---|---|
-| Linguagem | Python |
-| Manipulação e Vetorização | Pandas, NumPy |
-| Integração Externa | Requests (API REST JSON) |
-| Banco de Dados | SQLite in-memory |
-| Modelagem | Star Schema com Surrogate Keys |
+| Camada                    | Tecnologia                     |
+| ------------------------- | ------------------------------ |
+| Linguagem                 | Python                         |
+| Manipulação e Vetorização | Pandas, NumPy                  |
+| Integração Externa        | Requests (API REST JSON)       |
+| Banco de Dados            | SQLite in-memory               |
+| Modelagem                 | Star Schema com Surrogate Keys |
+| Arquitetura               | Pipeline Modular (`src/`)      |
 
 ---
 
 ## ⚙️ O Pipeline (ETL)
 
-1. **Extract:** Ingestão do arquivo histórico de voos (VRA) da ANAC e extração dinâmica de dados de precipitação via [Open-Meteo API](https://open-meteo.com/), consumindo as coordenadas dos aeroportos envolvidos (SBSP, SBGR, SBKP, SBRJ, SBGL).
+O pipeline é dividido em módulos independentes dentro de `src/`, cada um responsável por uma etapa do fluxo:
 
-2. **Transform:** Limpeza de dados nulos, vetorização de flags binárias para cancelamentos, criação de surrogate keys e separação do DataFrame principal em dimensões isoladas (`dim_tempo`, `dim_cia_aerea`, `dim_clima`).
+1. **Extract (`extract.py`):** Ingestão do arquivo histórico de voos (VRA) da ANAC e extração dinâmica de dados de precipitação via [Open-Meteo API](https://open-meteo.com/), consumindo as coordenadas dos aeroportos envolvidos (SBSP, SBGR, SBKP, SBRJ, SBGL).
 
-3. **Load:** Consolidação da tabela fato unificada e exportação em `.csv` para consumo em ferramentas de visualização ou Data Warehouses.
+2. **Transform (`transform.py`):** Limpeza de dados nulos, vetorização de flags binárias para cancelamentos, criação de surrogate keys e separação em dimensões isoladas (`dim_tempo`, `dim_cia_aerea`, `dim_clima`), sem atributos climáticos duplicados na tabela fato.
+
+3. **Load (`load.py`):** Consolidação da tabela fato e das dimensões no banco relacional SQLite, com validação de integridade do cruzamento voo x clima antes da liberação do dado.
+
+4. **Config (`config.py`) e Orquestração (`main.py`):** parâmetros de conexão, coordenadas e mapeamentos ficam centralizados em `config.py`; `main.py` executa o fluxo de ponta a ponta.
 
 ---
 
 ## 🗂️ Modelagem (Star Schema)
 
-![Star Schema](star_schema_digitalizado.png)
+[![Star Schema](https://github.com/alexandrecascardi/etl-clima-ponte-aerea-rj-sp/raw/main/star_schema_digitalizado.png)](/alexandrecascardi/etl-clima-ponte-aerea-rj-sp/blob/main/star_schema_digitalizado.png)
 
 > **Nota:** `DIM_AERONAVE` está mapeada no modelo e será implementada na próxima versão com dados simulados.
 
 ---
 
-## 📊 Questões de Negócio
+## 📊 Descobertas Operacionais Preliminares (Amostra de Jan/2024)
 
-O projeto foi construído para responder a três perguntas centrais:
+O modelo dimensional foi desenhado para estruturar o caos dos dados brutos e otimizar consultas analíticas. Com o pipeline rodando e os dados de Janeiro consolidados, as seguintes volumetrias foram extraídas (scripts SQL disponíveis na pasta `notebooks/`):
 
-**1. Qual companhia aérea é mais vulnerável em condições climáticas adversas na rota RJ-SP?**
-- ✅ Concluído. A Gol Linhas Aéreas registrou a maior taxa de cancelamentos sob condições adversas, com 6,65% dos voos cancelados em dias de chuva ou tempestade. A LATAM Airlines apresentou o melhor desempenho climático do grupo, com 5,28% de cancelamentos no mesmo cenário.
+**1. Qual companhia aérea apresentou o maior aumento de cancelamentos sob clima adverso?**
 
-**2. Qual o impacto das condições climáticas por tipo de aeronave?**
-- 🗺️ No roadmap. Requer cruzamento com a dimensão de equipamentos — será implementado com dados simulados na próxima versão.
+- Na amostra processada, a Azul Linhas Aéreas registrou o maior aumento comparativo: cancelamento subindo de 3,74% em dias de céu limpo para 8,50% em dias de tempestade (+4,76 pontos percentuais) — a maior variação entre as três companhias avaliadas.
 
-**3. Voos noturnos são mais impactados por condições climáticas do que voos diurnos?**
-- ✅ Concluído. O período noturno (18h–05h) se mostrou significativamente mais crítico, registrando taxa de cancelamento de 8,33% — quase o dobro do período diurno (06h–17h), que ficou em 4,76%.
+**2. Qual turno demonstrou maior criticidade operacional sob chuvas fortes?**
+
+- O período noturno (18h–05h) registrou o pico de impacto da amostra, com 14,29% de cancelamentos em condições de tempestade. Isso representa um aumento de +5,67 pontos percentuais em relação à operação desse mesmo turno em dias de céu limpo.
 
 ---
 
 ## 🚧 Roadmap
 
-- **Granularidade climática:** precipitação atualmente agregada por dia. Um dia com chuva concentrada na madrugada impacta menos a operação da tarde do que o modelo atual reflete. A próxima versão trará cruzamento hora a hora.
-- **Modularização:** refatoração do script para módulos separados (`extract.py`, `transform.py`, `load.py`).
+- **Big Data (Expansão Histórica):** Ingestão em lote de 12 meses contínuos de dados VRA para fornecer uma base volumosa, permitindo que times de Data Science realizem validações estatísticas de longo prazo.
+- **Frotas:** A análise de impacto operacional por modelo de aeronave será desenvolvida com a integração da base RAB/ANAC em uma nova Tabela Dimensão.
 - **Resiliência:** implementação de variáveis de ambiente (`.env`) e `try/except` com retries para instabilidades na API.
 - **Orquestração:** substituição do SQLite local por um Cloud Data Warehouse e agendamento via Apache Airflow.
 
@@ -89,20 +93,23 @@ O projeto foi construído para responder a três perguntas centrais:
 ## ▶️ Como Executar
 
 **1. Clone o repositório**
-```bash
-git clone https://github.com/alexandrecascardi/etl-clima-ponte-aerea.git
+
+```
+git clone https://github.com/alexandrecascardi/etl-clima-ponte-aerea-rj-sp.git
 ```
 
 **2. Instale as dependências**
-```bash
-pip install -r requirements.txt
+
+```
+pip install pandas numpy requests
 ```
 
 **3. Adicione o arquivo de dados**
 
-Faça o download do arquivo `VRA_20241.csv` diretamente no portal da ANAC e coloque na raiz do projeto.
+Faça o download do arquivo `VRA_20241.csv` diretamente no portal da ANAC e coloque no diretório `data/`.
 
 **4. Execute o pipeline**
-```bash
-python pipeline.py
+
+```
+python src/main.py
 ```
